@@ -1,0 +1,31 @@
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Jupyter-generated files
+.ipynb_checkpoints/
+
+# Node.js and Vite-generated files
+node_modules/
+dist/
+
+# Local environment variables (keep example templates)
+.env
+.env.*
+!.env.example
+
+# Generated model artifacts and derived train/test splits
+/models/*.joblib
+/data/train.parquet
+/data/test.parquet
+
+# OS/editor files
+.DS_Store
+Thumbs.db
