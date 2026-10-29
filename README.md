@@ -19,24 +19,22 @@ Then open `notebooks/model_evaluation.ipynb` to compare logistic regression,
 decision tree, and random forest accuracy and macro F1 using those saved split
 files.
 
-To run the same three-model comparison from the command line, from the project
-root run:
+To train the random forest for the prediction API from the command line, from
+the project root run:
 
 ```bash
 python -m src.train
 ```
 
-The script loads `data/train.parquet` and `data/test.parquet` and compares
-logistic regression, a decision tree, and a random forest. It reports training
-and test accuracy, test error rate, the generalization gap, and test macro F1.
-You can specify different saved split files:
+The script loads `data/train.parquet` and saves the trained model to
+`models/availability_classifier.joblib`. Model comparisons belong in the
+evaluation notebook. You can specify a different training file or model output:
 
 ```bash
-python -m src.train --train-data path/to/train.parquet --test-data path/to/test.parquet
+python -m src.train --train-data path/to/train.parquet --model-output path/to/model.joblib
 ```
 
-Training also writes the selected random-forest model to
-`models/availability_classifier.joblib`. Start the prediction API after training:
+Start the prediction API after training:
 
 ```bash
 uvicorn api.main:app --reload
@@ -53,9 +51,11 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 ```
 
 The response predicts an availability band and bike/free-slot count ranges,
-not exact counts. The model predicts `bike_bin` (0 bikes, 1-2, 3-5, or 6+);
-free-slot ranges are derived from the station capacity. The station metadata is
-read from `data/clean.parquet`.
+not exact counts. The model predicts `bike_bin` (0, 1-2, 3-5, 6-15, 16-19,
+20-25, or 26+ bikes); free-slot ranges are derived from the station capacity.
+The response includes the station's total dock capacity; estimated bikes and
+free slots together add up to that capacity. The station metadata is read from
+`data/clean.parquet`.
 
 ## Web frontend
 

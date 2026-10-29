@@ -24,7 +24,10 @@ AVAILABILITY_BANDS: dict[int, tuple[str, int, int | None]] = {
     0: ("empty", 0, 0),
     1: ("critical", 1, 2),
     2: ("moderate", 3, 5),
-    3: ("high", 6, None),
+    3: ("high", 6, 15),
+    4: ("very_high", 16, 19),
+    5: ("near_full", 20, 25),
+    6: ("26_plus", 26, None),
 }
 
 app = FastAPI(title=APP_TITLE, version="1.0.0")
@@ -61,10 +64,19 @@ class CountRange(BaseModel):
 class PredictionResponse(BaseModel):
     station_id: int
     station_name: str
+    total_slots: int
     requested_at: datetime
     prediction_type: Literal["availability_band"]
     predicted_bike_bin: int
-    availability_level: Literal["empty", "critical", "moderate", "high"]
+    availability_level: Literal[
+        "empty",
+        "critical",
+        "moderate",
+        "high",
+        "very_high",
+        "near_full",
+        "26_plus",
+    ]
     bikes: CountRange
     free_slots: CountRange
     class_probability: float = Field(ge=0, le=1)
@@ -191,6 +203,7 @@ def predict_availability(request: PredictionRequest) -> PredictionResponse:
     return PredictionResponse(
         station_id=request.station_id,
         station_name=str(station["name"]),
+        total_slots=capacity,
         requested_at=request.requested_at,
         prediction_type="availability_band",
         predicted_bike_bin=predicted_bin,
