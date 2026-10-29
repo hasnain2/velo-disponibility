@@ -12,14 +12,14 @@ from api.main import PredictionRequest, list_stations, predict_availability
 
 
 class FixedClassifier:
-    classes_ = [2]
-
-    def __init__(self) -> None:
+    def __init__(self, predicted_class: int = 2) -> None:
+        self.classes_ = [predicted_class]
+        self.predicted_class = predicted_class
         self.features: pd.DataFrame | None = None
 
     def predict(self, features: pd.DataFrame) -> list[int]:
         self.features = features
-        return [2]
+        return [self.predicted_class]
 
     def predict_proba(self, features: pd.DataFrame) -> list[list[float]]:
         return [[1.0]]
@@ -52,6 +52,7 @@ class PredictionEndpointTests(unittest.TestCase):
         response = predict_availability(request)
 
         self.assertEqual(response.station_name, "Sainte-Anne")
+        self.assertEqual(response.total_slots, 24)
         self.assertEqual(response.predicted_bike_bin, 2)
         self.assertEqual(response.availability_level, "moderate")
         self.assertEqual(response.bikes.model_dump(), {"min": 3, "max": 5})
@@ -62,6 +63,34 @@ class PredictionEndpointTests(unittest.TestCase):
         self.assertEqual(self.model.features.iloc[0]["hour"], 15)
         self.assertEqual(self.model.features.iloc[0]["day_of_week"], 2)
         self.assertEqual(self.model.features.iloc[0]["is_weekend"], 0)
+
+    def test_prediction_bins_return_bike_and_free_slot_ranges(self) -> None:
+        expected_ranges = {
+            0: ("empty", {"min": 0, "max": 0}, {"min": 24, "max": 24}),
+            1: ("critical", {"min": 1, "max": 2}, {"min": 22, "max": 23}),
+            2: ("moderate", {"min": 3, "max": 5}, {"min": 19, "max": 21}),
+            3: ("high", {"min": 6, "max": 15}, {"min": 9, "max": 18}),
+            4: ("very_high", {"min": 16, "max": 19}, {"min": 5, "max": 8}),
+            5: ("near_full", {"min": 20, "max": 24}, {"min": 0, "max": 4}),
+            6: ("26_plus", {"min": 24, "max": 24}, {"min": 0, "max": 0}),
+        }
+        request = PredictionRequest(
+            station_id=5505,
+            requested_at=datetime.fromisoformat("2026-10-28T15:00:00+01:00"),
+        )
+
+        for predicted_bin, (level, bikes, free_slots) in expected_ranges.items():
+            with self.subTest(predicted_bin=predicted_bin):
+                self.model.predicted_class = predicted_bin
+                self.model.classes_ = [predicted_bin]
+                response = predict_availability(request)
+
+                self.assertEqual(response.availability_level, level)
+                self.assertEqual(response.total_slots, 24)
+                self.assertEqual(response.bikes.model_dump(), bikes)
+                self.assertEqual(response.free_slots.model_dump(), free_slots)
+                self.assertEqual(response.bikes.min + response.free_slots.max, 24)
+                self.assertEqual(response.bikes.max + response.free_slots.min, 24)
 
     def test_unknown_station_returns_404(self) -> None:
         request = PredictionRequest(

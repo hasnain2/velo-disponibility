@@ -1,14 +1,20 @@
 import "./style.css";
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(
-  /\/$/,
-  "",
-);
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? "http://127.0.0.1:8000" : window.location.origin)
+).replace(/\/$/, "");
 
 const app = document.querySelector("#app");
 
 app.innerHTML = `
   <main class="page-shell">
+    <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite" hidden>
+      <div class="loading-panel">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span>Getting your availability forecast…</span>
+      </div>
+    </div>
     <header class="topbar">
       <a class="brand" href="/" aria-label="Vélo availability home">
         <span class="brand-mark" aria-hidden="true">V</span>
@@ -106,6 +112,7 @@ const requestedAtInput = document.querySelector("#requested-at");
 const submitButton = document.querySelector("#submit-button");
 const statusMessage = document.querySelector("#status-message");
 const result = document.querySelector("#result");
+const loadingOverlay = document.querySelector("#loading-overlay");
 let stationsById = new Map();
 
 function localDateTimeValue(date) {
@@ -134,10 +141,13 @@ function formatRange(range) {
 
 function renderResult(data) {
   const levelLabels = {
-    empty: "No bikes available",
-    critical: "Limited availability",
-    moderate: "Good availability",
-    high: "Plenty of bikes",
+    empty: "0 bikes",
+    critical: "1–2 bikes",
+    moderate: "3–5 bikes",
+    high: "6–15 bikes",
+    very_high: "16–19 bikes",
+    near_full: "20–25 bikes",
+    "26_plus": "26+ bikes",
   };
   const requestedTime = new Date(data.requested_at).toLocaleString(undefined, {
     dateStyle: "medium",
@@ -157,6 +167,12 @@ function renderResult(data) {
       </span>
     </div>
     <div class="availability-stats">
+      <article class="stat-tile capacity-tile">
+        <span class="stat-icon" aria-hidden="true">⌑</span>
+        <p class="stat-label">Total station docks</p>
+        <p class="stat-value">${escapeHtml(data.total_slots)}</p>
+        <p class="stat-unit">total capacity</p>
+      </article>
       <article class="stat-tile bike-tile">
         <span class="stat-icon" aria-hidden="true">↗</span>
         <p class="stat-label">Bikes available</p>
@@ -241,6 +257,8 @@ stationSelect.addEventListener("change", async () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   result.hidden = true;
+  loadingOverlay.hidden = false;
+  document.body.classList.add("forecast-loading");
   submitButton.disabled = true;
   submitButton.classList.add("is-loading");
   submitButton.querySelector(".button-label").textContent = "Getting forecast…";
@@ -268,6 +286,8 @@ form.addEventListener("submit", async (event) => {
       "error",
     );
   } finally {
+    loadingOverlay.hidden = true;
+    document.body.classList.remove("forecast-loading");
     submitButton.disabled = false;
     submitButton.classList.remove("is-loading");
     submitButton.querySelector(".button-label").textContent = "Check availability";
