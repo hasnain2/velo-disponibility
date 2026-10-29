@@ -8,9 +8,11 @@ from typing import Literal
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 from sklearn.ensemble import RandomForestClassifier
 from starlette.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 
 from src.features import FEATURE_COLUMNS, TARGET_COLUMN, build_feature_row
 
@@ -18,6 +20,7 @@ from src.features import FEATURE_COLUMNS, TARGET_COLUMN, build_feature_row
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT_DIR / "models" / "availability_classifier.joblib"
 STATION_DATA_PATH = ROOT_DIR / "data" / "clean.parquet"
+FRONTEND_DIST_PATH = ROOT_DIR / "frontend" / "dist"
 APP_TITLE = "Velo availability API"
 
 AVAILABILITY_BANDS: dict[int, tuple[str, int, int | None]] = {
@@ -39,6 +42,11 @@ app.add_middleware(
     ],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
+)
+app.mount(
+    "/assets",
+    StaticFiles(directory=FRONTEND_DIST_PATH / "assets", check_dir=False),
+    name="frontend-assets",
 )
 
 
@@ -215,3 +223,12 @@ def predict_availability(request: PredictionRequest) -> PredictionResponse:
         ),
         class_probability=probability_by_class[predicted_bin],
     )
+
+
+@app.get("/", include_in_schema=False)
+def frontend() -> FileResponse:
+    """Serve the compiled frontend in the single-container deployment."""
+    index_path = FRONTEND_DIST_PATH / "index.html"
+    if not index_path.is_file():
+        raise HTTPException(status_code=404, detail="Frontend has not been built.")
+    return FileResponse(index_path)

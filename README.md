@@ -57,6 +57,28 @@ The response includes the station's total dock capacity; estimated bikes and
 free slots together add up to that capacity. The station metadata is read from
 `data/clean.parquet`.
 
+## Container deployment
+
+The Docker image builds the Vite frontend and serves it from the FastAPI
+application, together with the trained model and station metadata. To build
+and run it locally from the project root:
+
+```bash
+docker build -t velo-disponibility .
+docker run --rm -p 8000:8000 velo-disponibility
+```
+
+Open `http://localhost:8000`. The API documentation remains available at
+`http://localhost:8000/docs`.
+
+To deploy the container on Render, push this repository to GitHub, create a
+new Blueprint in the Render dashboard, and connect the repository. Render
+will read `render.yaml` and build the Dockerfile. Its free web services sleep
+after inactivity and may take about a minute to wake; Render describes this
+plan as suitable for hobby and testing projects rather than production.
+The model and station data are included in the image, so they do not depend on
+Render's temporary filesystem.
+
 ## Web frontend
 
 The Vite frontend is in `frontend/`. It loads station choices from `GET /stations`,
@@ -80,8 +102,9 @@ npm run dev
 ```
 
 Open the local URL printed by Vite (normally `http://localhost:5173`). The page
-uses `http://127.0.0.1:8000` as its default API URL. If the API uses a different
-address or port, create `frontend/.env.local` from `frontend/.env.example` and
-set `VITE_API_URL` to the API base URL, for example
-`VITE_API_URL=http://127.0.0.1:18765`; restart Vite after changing it. The API
-allows the default Vite development origins through CORS.
+uses `http://127.0.0.1:8000` as its default API URL during development. For
+container deployments, it uses the same origin as the frontend automatically.
+If the development API uses a different address or port, create
+`frontend/.env.local` from `frontend/.env.example`, set `VITE_API_URL` to the
+API base URL, and restart Vite. The API allows the default Vite development
+origins through CORS.

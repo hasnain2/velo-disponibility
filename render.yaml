@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: velo-disponibility
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
