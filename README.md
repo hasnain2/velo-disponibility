@@ -83,7 +83,13 @@ Render's temporary filesystem.
 
 The Vite frontend is in `frontend/`. It loads station choices from `GET /stations`,
 lets the user select a station and local date/time, then sends a request to
-`POST /predict` and displays the estimated bike and free-slot ranges.
+`POST /predict` and displays the estimated bike and free-slot ranges. The chart
+at the bottom compares Monday through Sunday for the selected station. Each
+point is the average of the model's probability-weighted hourly bike estimates
+for that weekday; lower average availability indicates a busier station. This
+is a typical weekday pattern, not a date-specific or live forecast. The
+comparison endpoint is `POST /predict/week`; `POST /predict/day` remains
+available for 24-hour forecasts for a specific date.
 
 Install Node.js 20 or newer (which includes npm) before starting the frontend.
 
