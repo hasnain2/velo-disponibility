@@ -282,7 +282,8 @@ h1 span {
 }
 
 .forecast-card,
-.result-card {
+.result-card,
+.day-forecast-card {
   position: relative;
   z-index: 2;
   border: 1px solid rgb(33 55 39 / 7%);
@@ -293,6 +294,85 @@ h1 span {
 
 .forecast-card {
   padding: 29px 34px 22px;
+}
+
+.day-forecast-card {
+  margin-top: 18px;
+  padding: 29px 34px 22px;
+}
+
+.chart-summary {
+  margin: 8px 0 0;
+  color: #78827b;
+  font-size: 12px;
+}
+
+.chart-message {
+  margin: -8px 0 8px;
+  color: #6b796e;
+  font-size: 12px;
+}
+
+.chart-message.error {
+  color: #a23f36;
+}
+
+.day-chart {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.forecast-chart {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: #e8ede7;
+  stroke-width: 1;
+}
+
+.chart-axis-label,
+.chart-axis-title {
+  fill: #7b887e;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.chart-line {
+  fill: none;
+  stroke: #36794d;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.chart-range,
+.chart-range-cap {
+  stroke: #85a98b;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.chart-dot {
+  fill: #fff;
+  stroke: #36794d;
+  stroke-width: 2.5;
+  transition: r 120ms ease, fill 120ms ease;
+}
+
+.chart-point.is-busiest .chart-dot {
+  fill: #d89048;
+  stroke: #a85b25;
+}
+
+.chart-note {
+  margin: 3px 0 0;
+  color: #89928b;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .card-heading {
@@ -730,7 +810,8 @@ input {
   }
 
   .forecast-card,
-  .result-card {
+  .result-card,
+  .day-forecast-card {
     padding-right: 19px;
     padding-left: 19px;
   }
@@ -762,6 +843,10 @@ input {
 
   .availability-stats {
     gap: 10px;
+  }
+
+  .forecast-chart {
+    min-width: 620px;
   }
 
   .stat-tile {

@@ -1,6 +1,6 @@
 """FastAPI service for bike-availability predictions."""
 
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -14,7 +14,12 @@ from sklearn.ensemble import RandomForestClassifier
 from starlette.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 
-from src.features import FEATURE_COLUMNS, TARGET_COLUMN, build_feature_row
+from src.features import (
+    FEATURE_COLUMNS,
+    LOCAL_TIMEZONE,
+    TARGET_COLUMN,
+    build_feature_row,
+)
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -64,6 +69,15 @@ class PredictionRequest(BaseModel):
         return value
 
 
+class DayForecastRequest(BaseModel):
+    station_id: int = Field(gt=0, description="Station identifier from the bike network")
+    forecast_date: date = Field(description="Calendar date in the station's local timezone")
+
+
+class WeekForecastRequest(BaseModel):
+    station_id: int = Field(gt=0, description="Station identifier from the bike network")
+
+
 class CountRange(BaseModel):
     min: int
     max: int
@@ -94,6 +108,52 @@ class StationResponse(BaseModel):
     station_id: int
     station_name: str
     total_slots: int
+
+
+class HourlyForecast(BaseModel):
+    hour: int = Field(ge=0, le=23)
+    predicted_bike_bin: int
+    availability_level: Literal[
+        "empty",
+        "critical",
+        "moderate",
+        "high",
+        "very_high",
+        "near_full",
+        "26_plus",
+    ]
+    bikes: CountRange
+    free_slots: CountRange
+    class_probability: float = Field(ge=0, le=1)
+
+
+class DayForecastResponse(BaseModel):
+    station_id: int
+    station_name: str
+    total_slots: int
+    forecast_date: date
+    hourly_predictions: list[HourlyForecast]
+
+
+class WeekdayForecast(BaseModel):
+    day_of_week: int = Field(ge=0, le=6)
+    day_name: Literal[
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+    average_bikes: float = Field(ge=0)
+
+
+class WeekForecastResponse(BaseModel):
+    station_id: int
+    station_name: str
+    total_slots: int
+    weekly_predictions: list[WeekdayForecast]
 
 
 @lru_cache(maxsize=1)
@@ -222,6 +282,168 @@ def predict_availability(request: PredictionRequest) -> PredictionResponse:
             max=capacity - bike_minimum,
         ),
         class_probability=probability_by_class[predicted_bin],
+    )
+
+
+@app.post("/predict/day", response_model=DayForecastResponse)
+def predict_day(request: DayForecastRequest) -> DayForecastResponse:
+    """Predict bike and free-slot ranges for every local hour of a day."""
+    model, stations = load_predictor()
+    station = stations.get(request.station_id)
+    if station is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown station_id: {request.station_id}",
+        )
+
+    timestamps = [
+        datetime.combine(request.forecast_date, time(hour), tzinfo=LOCAL_TIMEZONE)
+        for hour in range(24)
+    ]
+    features = pd.concat(
+        [
+            build_feature_row(
+                station_id=request.station_id,
+                latitude=float(station["lat"]),
+                longitude=float(station["lon"]),
+                total_slots=int(station["slots_total"]),
+                requested_at=requested_at,
+            )
+            for requested_at in timestamps
+        ],
+        ignore_index=True,
+    )
+    predicted_bins = model.predict(features)
+    probabilities = model.predict_proba(features)
+    capacity = int(station["slots_total"])
+    hourly_predictions = []
+
+    for hour, predicted_bin, class_probabilities in zip(
+        range(24), predicted_bins, probabilities, strict=True
+    ):
+        predicted_bin = int(predicted_bin)
+        try:
+            level, bike_minimum, bike_maximum = AVAILABILITY_BANDS[predicted_bin]
+        except KeyError as error:
+            raise RuntimeError(
+                f"Model returned unknown bike_bin class: {predicted_bin}"
+            ) from error
+
+        bike_minimum = min(bike_minimum, capacity)
+        bike_maximum = capacity if bike_maximum is None else min(bike_maximum, capacity)
+        probability_by_class = {
+            int(class_label): float(probability)
+            for class_label, probability in zip(
+                model.classes_, class_probabilities, strict=True
+            )
+        }
+        hourly_predictions.append(
+            HourlyForecast(
+                hour=hour,
+                predicted_bike_bin=predicted_bin,
+                availability_level=level,
+                bikes=CountRange(min=bike_minimum, max=bike_maximum),
+                free_slots=CountRange(
+                    min=capacity - bike_maximum,
+                    max=capacity - bike_minimum,
+                ),
+                class_probability=probability_by_class[predicted_bin],
+            )
+        )
+
+    return DayForecastResponse(
+        station_id=request.station_id,
+        station_name=str(station["name"]),
+        total_slots=capacity,
+        forecast_date=request.forecast_date,
+        hourly_predictions=hourly_predictions,
+    )
+
+
+@app.post("/predict/week", response_model=WeekForecastResponse)
+def predict_week(request: WeekForecastRequest) -> WeekForecastResponse:
+    """Estimate average bike availability for each weekday at a station."""
+    model, stations = load_predictor()
+    station = stations.get(request.station_id)
+    if station is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown station_id: {request.station_id}",
+        )
+
+    today = datetime.now(LOCAL_TIMEZONE).date()
+    monday = today - timedelta(days=today.weekday())
+    timestamps = [
+        datetime.combine(
+            monday + timedelta(days=day_of_week),
+            time(hour),
+            tzinfo=LOCAL_TIMEZONE,
+        )
+        for day_of_week in range(7)
+        for hour in range(24)
+    ]
+    features = pd.concat(
+        [
+            build_feature_row(
+                station_id=request.station_id,
+                latitude=float(station["lat"]),
+                longitude=float(station["lon"]),
+                total_slots=int(station["slots_total"]),
+                requested_at=requested_at,
+            )
+            for requested_at in timestamps
+        ],
+        ignore_index=True,
+    )
+    probabilities = model.predict_proba(features)
+    capacity = int(station["slots_total"])
+    expected_bikes_by_class = []
+    for class_label in model.classes_:
+        try:
+            _, bike_minimum, bike_maximum = AVAILABILITY_BANDS[int(class_label)]
+        except KeyError as error:
+            raise RuntimeError(
+                f"Model returned unknown bike_bin class: {class_label}"
+            ) from error
+        bike_minimum = min(bike_minimum, capacity)
+        bike_maximum = capacity if bike_maximum is None else min(bike_maximum, capacity)
+        expected_bikes_by_class.append((bike_minimum + bike_maximum) / 2)
+
+    expected_bikes_by_hour = [
+        sum(
+            float(probability) * expected_bikes
+            for probability, expected_bikes in zip(
+                class_probabilities, expected_bikes_by_class, strict=True
+            )
+        )
+        for class_probabilities in probabilities
+    ]
+    weekdays = (
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    )
+    weekly_predictions = [
+        WeekdayForecast(
+            day_of_week=day_of_week,
+            day_name=day_name,
+            average_bikes=sum(
+                expected_bikes_by_hour[day_of_week * 24 : (day_of_week + 1) * 24]
+            )
+            / 24,
+        )
+        for day_of_week, day_name in enumerate(weekdays)
+    ]
+
+    return WeekForecastResponse(
+        station_id=request.station_id,
+        station_name=str(station["name"]),
+        total_slots=capacity,
+        weekly_predictions=weekly_predictions,
     )
 
 
