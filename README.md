@@ -30,12 +30,11 @@ Evaluated on a stratified 80/20 split, with macro F1 as the main metric because 
 
 | Model | Accuracy | Macro F1 |
 |---|---|---|
-| Baseline: most common class per station, hour and weekday | x.xx | x.xx |
-| Logistic regression | x.xx | x.xx |
-| Decision tree | x.xx | x.xx |
-| **Random Forest (used in the app)** | x.xx | x.xx |
+| Baseline: most common class per station, hour and weekday | 0.532 | 0.099 |
+| Logistic regression | 0.227 | 0.156 |
+| Decision tree | 0.718 | 0.643 |
+| **Random Forest (used in the app)** | 0.727 | 0.646 |
 
-<!-- Replace x.xx with the scores from notebooks/model_evaluation.ipynb. -->
 
 ## Limitations
 
