@@ -1,0 +1,13 @@
+services:
+  collector:
+    build: .
+    container_name: bike-collector
+    restart: unless-stopped          # survives crashes and reboots
+    environment:
+      INTERVAL_MIN: "20"
+    volumes:
+      - ./data:/data                 # SQLite file lives on your disk
+    healthcheck:                     # unhealthy if no successful poll in 65 min
+      test: ["CMD", "python", "-c", "import os,time,sys; sys.exit(0 if time.time()-os.path.getmtime('/data/last_ok')<3900 else 1)"]
+      interval: 5m
+      start_period: 5m
