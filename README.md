@@ -31,7 +31,7 @@ Evaluated on a stratified 80/20 split, with macro F1 as the main metric because 
 | Model | Accuracy | Macro F1 |
 |---|---|---|
 | Baseline: most common class per station, hour and weekday | 0.532 | 0.099 |
-| Logistic regression | 0.227 | 0.156 |
+| Logistic regression | 0.23 | 0.156 |
 | Decision tree | 0.718 | 0.643 |
 | **Random Forest (used in the app)** | 0.727 | 0.646 |
 
