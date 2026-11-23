@@ -26,7 +26,7 @@ A web app that estimates how many bikes and free docks you can expect at a bike-
 
 ## Results
 
-Evaluated on a stratified 80/20 split, with macro F1 as the main metric because the classes are unbalanced.
+Evaluated on a chronological split, with macro F1 as the main metric because the classes are unbalanced.
 
 | Model | Accuracy | Macro F1 |
 |---|---|---|
@@ -37,8 +37,6 @@ Evaluated on a stratified 80/20 split, with macro F1 as the main metric because 
 
 
 ## Limitations
-
-- **Random split:** rows from the same station and hour, 20 minutes apart, can land in both train and test. Scores are therefore optimistic compared with predicting truly future data.
 - **Short history:** the data covers a limited period, so rare days (holidays, events, bad weather) are not well represented.
 - **Simple features:** no weather, no holidays, no recent values of the station. The model cannot react to what is happening right now.
 - **Ranges, not exact counts:** the output is a class converted to a range.
@@ -132,7 +130,6 @@ To deploy on Render, connect this repository as a Blueprint. Render reads `rende
 
 ## Possible next steps
 
-- Evaluate with a time-based split (train on the past, test on the future).
 - Add weather and holiday features.
 - Add recent station values to estimate short-term availability.
 - Track experiments and add model monitoring.
